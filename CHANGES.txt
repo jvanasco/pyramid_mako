@@ -5,6 +5,13 @@ unreleased
   the ``preprocessor`` will be wrapped in a function that invokes the 
   preprocessor with pyramid's config settings as the second argument.
 
+- Add a config option for ``precompile``. If set to one or more asset 
+  specifications, either files or directories, they will be recursively 
+  precompiled on startup. This is achieved by invoking the `get_template`
+  function of the configured TemplateLookup object, and will utilize any
+  configured preprocessors.
+
+
 1.0.2 (2014-04-22)
 ==================
 

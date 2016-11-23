@@ -500,9 +500,9 @@ If set to ``true``, the ``mako.preprocessor`` will be wrapped in a function that
 invokes the  preprocessor with pyramid's config settings as the second argument.
 This will allow the preprocessor to act based upon the settings.
 
-	def mako_preprocessor(template, settings):
-	    template = template.replace("foo", settings.get("foo_replacement"))
-	    return template
+    def mako_preprocessor(template, settings):
+        template = template.replace("foo", settings.get("foo_replacement"))
+        return template
 
 +----------------------------------------+
 | Config File Setting Name               |
@@ -512,6 +512,31 @@ This will allow the preprocessor to act based upon the settings.
 |                                        |
 |                                        |
 +----------------------------------------+
+
+ 
+Precompile Templates
+------------------------------------
+
+If set to one or more asset specifications, they will be loaded via the 
+applicable lookup's `get_template` function, and compiled into template objects
+at application initialization.
+
+    mako.directories = myapp:templates
+    mako.precompile = myapp:templates
+
+or
+
+    mako.directories = myapp:templates myapp:templates-alt
+    mako.precompile = myapp:templates-alt/some_other_template.mako
+
++-----------------------------+
+| Config File Setting Name    |
++=============================+
+|  ``mako.precompile``        |
+|                             |
+|                             |
+|                             |
++-----------------------------+
 
 
 Reloading Templates

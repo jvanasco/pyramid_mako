@@ -641,6 +641,166 @@ class TestMakoRenderingException(unittest.TestCase):
         self.assertEqual(str(exc), 'text')
         self.assertEqual(repr(exc), 'text')
 
+class TestPkgResourceTemplateLookupPrecompile(unittest.TestCase):
+
+    def setUp(self):
+        self.config = testing.setUp()
+        self.config.add_settings({'mako.directories':
+                                  'pyramid_mako.tests:fixtures'})
+        self.config.include('pyramid_mako')
+    
+    def _get_mako_factory(self, extension='.mak'):
+        from pyramid.interfaces import IRendererFactory
+        mako_factory = self.config.registry.queryUtility(IRendererFactory, extension)
+        return mako_factory
+        
+    def _get_assetspec_assets(self, assetspec, extension=".mak"):
+        from pyramid.asset import abspath_from_asset_spec
+        filepath = abspath_from_asset_spec(assetspec)       
+        expected_elements = [f for f in os.listdir(filepath) if f[-4:] == '.mak']
+        assetspec_directories = [d for d in os.listdir(filepath) if os.path.isdir(os.path.join(filepath, d))]
+        for d in assetspec_directories:
+            abspath_d = os.path.join(filepath, d)
+            d_elements = [os.path.join(d, f) for f in os.listdir(abspath_d) if f[-4:] == '.mak']
+            expected_elements.extend(d_elements)
+        return expected_elements
+
+    def test_precompile_one(self):
+        """derive the factory, test the precompile function
+        """
+        from pyramid.renderers import render
+        
+        template_uri_raw = 'pyramid_mako.tests:fixtures/helloworld.mako'
+        self.config.add_settings({'foo.directories':
+                                  'pyramid_mako.tests:fixtures',
+                                  'foo.precompile': template_uri_raw,
+                                  })
+        self.config.add_mako_renderer('.mak', settings_prefix='foo.')
+        mako_factory = self._get_mako_factory('.mak')
+        self.assertTrue(mako_factory is not None)
+        self.assertTrue(len(mako_factory.lookup._collection) == 1)
+
+        # translation made by `pyramid_mako.PkgResourceTemplateLookup`        
+        uri_adjusted = template_uri_raw.replace(':', '$')
+        self.assertTrue(uri_adjusted in mako_factory.lookup._collection)
+        
+        # now let's try to access the same template other ways
+        rendered = render('helloworld.mako', {})
+        self.assertTrue(len(mako_factory.lookup._collection) == 1)
+
+        # and once more...
+        rendered = render('fixtures/helloworld.mako', {})
+        self.assertTrue(len(mako_factory.lookup._collection) == 1)
+
+        # if we pass, that means we loaded the asset spec correctly. yay.
+
+
+    def test_precompile_directory(self):
+        # derive the factory, test the precompile function
+        from pyramid.renderers import render
+        import os
+        template_directory_uri_raw = 'pyramid_mako.tests:fixtures'
+        self.config.add_settings({'foo.directories':
+                                  'pyramid_mako.tests:fixtures',
+                                  'foo.precompile': template_directory_uri_raw,
+                                  })
+        self.config.add_mako_renderer('.mak', settings_prefix='foo.')
+        mako_factory = self._get_mako_factory('.mak')
+        self.assertTrue(mako_factory is not None)
+        self.assertTrue(len(mako_factory.lookup._collection) > 1)
+
+        # translation made by `pyramid_mako.PkgResourceTemplateLookup`        
+        uri_directory_adjusted = template_directory_uri_raw.replace(':', '$')
+        
+        # how many items do we have in this folder?
+        expected_elements = self._get_assetspec_assets(template_directory_uri_raw, extension=".mak")
+
+        expected_elements_len = len(expected_elements)
+        self.assertTrue(expected_elements_len > 1)
+        self.assertTrue(expected_elements_len == len(mako_factory.lookup._collection))
+
+        # make sure each file is in preloaded
+        for mako_file in expected_elements:
+            mako_uri = os.path.join(uri_directory_adjusted, mako_file)
+            self.assertTrue(mako_uri in mako_factory.lookup._collection)
+
+        # let's try to render each one again, using the raw          
+        len_collection = len(mako_factory.lookup._collection)
+        for mako_file in expected_elements:
+            mako_uri = os.path.join(template_directory_uri_raw, mako_file)
+            t = mako_factory.lookup.get_template(mako_uri)
+        len_collection_post = len(mako_factory.lookup._collection)
+        self.assertTrue(len_collection == len_collection_post)
+        
+
+    def test_precompile_mixed(self):
+        # derive the factory, test the precompile function
+        # we need a fixtures_one folder with 1 item
+        from pyramid.renderers import render
+        import os
+        template_uri_raw = 'pyramid_mako.tests:fixtures_one/helloworld.mak'
+        template_directory_uri_raw = 'pyramid_mako.tests:fixtures'
+        self.config.add_settings({'foo.directories':
+                                  'pyramid_mako.tests:fixtures' + '\n' + template_directory_uri_raw,
+                                  'foo.precompile': template_uri_raw + '\n' + template_directory_uri_raw,
+                                  })
+        self.config.add_mako_renderer('.mak', settings_prefix='foo.')
+        mako_factory = self._get_mako_factory('.mak')
+        self.assertTrue(mako_factory is not None)
+        self.assertTrue(len(mako_factory.lookup._collection) > 1)
+        
+        # translation made by `pyramid_mako.PkgResourceTemplateLookup`        
+        uri_directory_adjusted = template_directory_uri_raw.replace(':', '$')
+        
+        # how many items do we have in the folder? MORE THAN ONE
+        expected_elements = self._get_assetspec_assets(template_directory_uri_raw, extension=".mak")
+
+        expected_elements_len = len(expected_elements)
+        self.assertTrue(expected_elements_len > 1)
+        
+        # make sure each file in is preloaded
+        for mako_file in expected_elements:
+            mako_uri = os.path.join(uri_directory_adjusted, mako_file)
+            self.assertTrue(mako_uri in mako_factory.lookup._collection)
+
+        # what about our other file?
+        # translation made by `pyramid_mako.PkgResourceTemplateLookup`        
+        uri_adjusted = template_uri_raw.replace(':', '$')
+        self.assertTrue(uri_adjusted in mako_factory.lookup._collection)
+        
+        expected_elements_len_all = expected_elements_len + 1
+        self.assertTrue(expected_elements_len_all == len(mako_factory.lookup._collection))
+        
+        # now let's try to access the same template other ways
+        rendered = render('helloworld.mako', {})
+        self.assertTrue(len(mako_factory.lookup._collection) == expected_elements_len_all)
+
+    def test_recursive_function(self):
+        """this test provides coverage tests for an edge case, in which a 
+        single file is passed to `recursive_precompile`
+        """
+        from pyramid.renderers import render
+        from pyramid_mako import recursive_precompile
+        
+        template_uri_raw = 'pyramid_mako.tests:fixtures/helloworld.mako'
+        template_uri_raw_directory = 'pyramid_mako.tests:fixtures'
+        self.config.add_settings({'foo.directories':
+                                  'pyramid_mako.tests:fixtures',
+                                  })
+        self.config.add_mako_renderer('.mak', settings_prefix='foo.')
+        mako_factory = self._get_mako_factory('.mak')
+        self.assertTrue(mako_factory is not None)
+        self.assertTrue(len(mako_factory.lookup._collection) == 0)
+
+        # try loading one file
+        recursive_precompile(mako_factory.lookup, '.mak', template_uri_raw)
+        self.assertTrue(len(mako_factory.lookup._collection) == 1)
+
+        # try loading many
+        recursive_precompile(mako_factory.lookup, '.mak', template_uri_raw_directory)
+        self.assertTrue(len(mako_factory.lookup._collection) > 1)
+
+
 class DummyLookup(object):
     directories = True
 
