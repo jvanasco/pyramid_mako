@@ -738,8 +738,8 @@ class TestPkgResourceTemplateLookupPrecompile(unittest.TestCase):
         # we need a fixtures_one folder with 1 item
         from pyramid.renderers import render
         import os
-        template_uri_raw = 'pyramid_mako.tests:fixtures_one/helloworld.mak'
-        template_directory_uri_raw = 'pyramid_mako.tests:fixtures'
+        template_uri_raw = 'pyramid_mako.tests:fixtures/nested_2/helloworld_simple.mak'
+        template_directory_uri_raw = 'pyramid_mako.tests:fixtures/nested_1'
         self.config.add_settings({'foo.directories':
                                   'pyramid_mako.tests:fixtures' + '\n' + template_directory_uri_raw,
                                   'foo.precompile': template_uri_raw + '\n' + template_directory_uri_raw,
